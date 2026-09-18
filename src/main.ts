@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { MyQApplication } from './app';
 
 async function main(): Promise<void> {

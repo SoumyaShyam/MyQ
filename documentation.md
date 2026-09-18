@@ -3,7 +3,7 @@
 ## Phase 1 Architecture and Implementation Specification
 
 **Status:** Implemented Phase 1 baseline  
-**Version:** 0.3.1  
+**Version:** 0.3.2  
 **Date:** 2026-09-18  
 **Runtime:** Node.js  
 **Language:** TypeScript  
@@ -103,7 +103,7 @@ Phase 1 does not claim full ACID transactions across multiple statements. The un
 
 ### 1.3 Implementation status
 
-| Capability | Status in `0.3.1` | Notes |
+| Capability | Status in `0.3.2` | Notes |
 |---|---|---|
 | SQL tokenizer and typed AST | Implemented | Self-contained TypeScript parser; ANTLR grammar is retained as the canonical grammar artifact. |
 | CRUD, filtering, ordering, limits | Implemented | Rule-based execution over the portable storage adapter. |
@@ -1546,6 +1546,14 @@ Phase 1 is complete when:
 ---
 
 ## 23. Changelog
+
+### 0.3.2 - 2026-09-18
+
+- Added automatic `.env` loading through `dotenv/config`.
+- Added the `npm.cmd run client -- "SQL"` one-query TCP client workflow.
+- Expanded README server setup, startup, query, configuration, and shutdown instructions.
+- Corrected protocol client documentation to require the complete `MYQ1` frame and checksum.
+- Bumped project metadata to `0.3.2`.
 
 ### 0.3.1 - 2026-09-18
 

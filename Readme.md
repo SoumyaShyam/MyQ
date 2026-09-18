@@ -9,6 +9,7 @@ The complete architecture and implementation specification is in [documentation.
 - [Current status](#current-status)
 - [Requirements](#requirements)
 - [Install and run](#install-and-run)
+- [Use the server](#use-the-server)
 - [Configuration](#configuration)
 - [SQL examples](#sql-examples)
 - [TCP protocol](#tcp-protocol)
@@ -31,7 +32,7 @@ Implemented in this repository:
 - Native TCP server with length-prefixed JSON frames.
 - Focused parser, storage, index, WAL, and protocol tests.
 
-The current implementation is the `0.3.1` Phase 1 development baseline. The file-backed storage adapter keeps local setup portable; the storage interface is the replacement point for a production RocksDB binding. Replication, sharding, MVCC, caching, clustering, optimizer work, metrics, and MySQL wire compatibility are not implemented.
+The current implementation is the `0.3.2` Phase 1 development baseline. The file-backed storage adapter keeps local setup portable; the storage interface is the replacement point for a production RocksDB binding. Replication, sharding, MVCC, caching, clustering, optimizer work, metrics, and MySQL wire compatibility are not implemented.
 
 The security maintenance release upgrades bcrypt to `6.0.0`, removing the vulnerable `@mapbox/node-pre-gyp` and `tar` dependency chain. npm install scripts are explicitly approved only for the pinned native packages `bcrypt@6.0.0` and `esbuild@0.28.2`; these scripts are required to install their platform binaries.
 
@@ -53,6 +54,8 @@ npm.cmd start
 
 PowerShell execution policy may block the `npm` shim on Windows. Use `npm.cmd` as shown above, or run the commands from a shell where npm scripts are enabled.
 
+For development, `npm.cmd run dev` starts the TypeScript entrypoint directly. For a normal deployment, build once with `npm.cmd run build`, then start the compiled server with `npm.cmd start`.
+
 The server listens on `127.0.0.1:3306` by default. It creates `data/store.json` and `data/wal/wal.jsonl` on first start. The development administrator is:
 
 ```text
@@ -61,6 +64,77 @@ password: admin
 ```
 
 Change this credential before using MyQ outside local development. Set `MYQ_JWT_SECRET` to a strong secret in every non-development environment.
+
+## Use the server
+
+Follow these steps from a fresh checkout:
+
+1. Install dependencies:
+
+	```powershell
+	npm.cmd install
+	```
+
+2. Create the local configuration file:
+
+	```powershell
+	Copy-Item .env.example .env
+	```
+
+	Edit `.env` before production use. The server loads `.env` automatically at startup. At minimum, replace `MYQ_JWT_SECRET` and the default administrator password workflow.
+
+3. Check the installation:
+
+	```powershell
+	npm.cmd run typecheck
+	npm.cmd test
+	npm.cmd run build
+	```
+
+4. Start the server in one terminal:
+
+	```powershell
+	npm.cmd start
+	```
+
+	Keep this terminal running. The server opens storage and replays the WAL before it accepts TCP connections.
+
+5. In a second terminal, execute a query with the included client:
+
+	```powershell
+	npm.cmd run client -- "SELECT * FROM users"
+	```
+
+	The client logs in as `admin` using `MYQ_USER` and `MYQ_PASSWORD` when supplied, then sends the SQL query to `MYQ_DATABASE`.
+
+6. To use a different server address or credentials:
+
+	```powershell
+	$env:MYQ_HOST = '127.0.0.1'
+	$env:MYQ_PORT = '3306'
+	$env:MYQ_USER = 'admin'
+	$env:MYQ_PASSWORD = 'admin'
+	$env:MYQ_DATABASE = 'app'
+	npm.cmd run client -- "SELECT * FROM users WHERE id = 1"
+	```
+
+7. Stop the server with `Ctrl+C`. MyQ stops accepting connections, closes the WAL, and flushes the storage file.
+
+### First database setup
+
+The client sends one query per invocation. Create the database and table by running the server, then use a small Node.js script or a TCP client that sends these statements in sequence:
+
+```sql
+CREATE DATABASE app;
+CREATE TABLE users (
+	 id INT PRIMARY KEY,
+	 name VARCHAR(255) NOT NULL,
+	 email VARCHAR(255) UNIQUE
+);
+INSERT INTO users VALUES (1, 'Soumya', 's@example.com');
+```
+
+The included client is intentionally one-query-per-process. For an interactive workflow, use the protocol from [TCP protocol](#tcp-protocol) or build a client around `src/network/FrameCodec.ts`.
 
 ## Configuration
 
@@ -136,7 +210,7 @@ Query response:
 {"type":"QUERY_OK","requestId":"r2","result":{"columns":["id","name","email"],"rows":[{"id":1,"name":"Soumya","email":"s@example.com"}]}}
 ```
 
-For a quick client, use any TCP library that can write a 4-byte big-endian length followed by the JSON bytes. The server also accepts `PING` frames and returns `PONG`.
+The repository includes `npm.cmd run client -- "SQL"` for one-query requests. For another client, send the complete `MYQ1` frame described above, including its checksum; a plain 4-byte length prefix is not sufficient. The server also accepts `PING` frames and returns `PONG`.
 
 ## Project commands
 
@@ -148,6 +222,7 @@ For a quick client, use any TCP library that can write a 4-byte big-endian lengt
 | `npm.cmd run typecheck` | Run strict TypeScript validation |
 | `npm.cmd test` | Run Jest tests serially |
 | `npm.cmd run test:watch` | Run Jest in watch mode |
+| `npm.cmd run client -- "SQL"` | Login and execute one SQL query |
 
 ## Data safety
 
